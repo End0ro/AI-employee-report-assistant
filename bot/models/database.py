@@ -1,7 +1,7 @@
 import aiosqlite
 import os
 
-DB_PATH = os.path.join("/tmp", "data.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data.db")
 
 
 async def get_db() -> aiosqlite.Connection:
