@@ -59,8 +59,9 @@ async def cmd_status(message: Message):
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 
-@router.message(Command("testreminder"))
-async def cmd_test_reminder(message: Message, bot: Bot):
+@router.message(Command("testreminder1"))
+async def cmd_test_reminder1(message: Message, bot: Bot):
+    """Friday reminder — 2 days before deadline."""
     if not is_owner(message):
         await message.answer("❌ Эта команда доступна только владельцу.")
         return
@@ -79,7 +80,8 @@ async def cmd_test_reminder(message: Message, bot: Bot):
                 text=(
                     "⏰ <b>Напоминание!</b>\n\n"
                     "Не забудьте сдать еженедельный отчёт.\n"
-                    "Дедлайн: воскресенье, 18:00.\n\n"
+                    "Дедлайн: воскресенье, 18:00.\n"
+                    "Осталось 2 дня.\n\n"
                     "Отправьте отчёт: /report"
                 ),
                 parse_mode="HTML",
@@ -89,7 +91,84 @@ async def cmd_test_reminder(message: Message, bot: Bot):
             pass
 
     await message.answer(
-        f"📨 Напоминание отправлено: {sent}/{len(missing)} сотрудникам.",
+        f"📨 Напоминание (за 2 дня) отправлено: {sent}/{len(missing)} сотрудникам.",
+    )
+
+
+@router.message(Command("testreminder2"))
+async def cmd_test_reminder2(message: Message, bot: Bot):
+    """Saturday reminder — 1 day before deadline."""
+    if not is_owner(message):
+        await message.answer("❌ Эта команда доступна только владельцу.")
+        return
+
+    missing = await get_employees_without_report_this_week()
+
+    if not missing:
+        await message.answer("✅ Все сотрудники уже сдали отчёт. Некому отправлять напоминание.")
+        return
+
+    sent = 0
+    for emp in missing:
+        try:
+            await bot.send_message(
+                chat_id=emp["telegram_id"],
+                text=(
+                    "⏰ <b>Напоминание!</b>\n\n"
+                    "Не забудьте сдать еженедельный отчёт.\n"
+                    "Дедлайн: воскресенье, 18:00.\n"
+                    "Остался 1 день.\n\n"
+                    "Отправьте отчёт: /report"
+                ),
+                parse_mode="HTML",
+            )
+            sent += 1
+        except Exception:
+            pass
+
+    await message.answer(
+        f"📨 Напоминание (за 1 день) отправлено: {sent}/{len(missing)} сотрудникам.",
+    )
+
+
+@router.message(Command("testreminder3"))
+async def cmd_test_reminder3(message: Message, bot: Bot):
+    """Sunday reminder — deadline day. Also notifies the owner."""
+    if not is_owner(message):
+        await message.answer("❌ Эта команда доступна только владельцу.")
+        return
+
+    missing = await get_employees_without_report_this_week()
+
+    if not missing:
+        await message.answer("✅ Все сотрудники уже сдали отчёт. Некому отправлять напоминание.")
+        return
+
+    sent = 0
+    for emp in missing:
+        try:
+            await bot.send_message(
+                chat_id=emp["telegram_id"],
+                text=(
+                    "🚨 <b>Сегодня крайний срок сдачи отчёта!</b>\n\n"
+                    "Пожалуйста, отправьте отчёт с помощью /report.\n"
+                    "Дедлайн: сегодня в 18:00."
+                ),
+                parse_mode="HTML",
+            )
+            sent += 1
+        except Exception:
+            pass
+
+    # Notify owner about who hasn't submitted
+    names = "\n".join(
+        f"  • {e['full_name']} (@{e['username'] or '—'})" for e in missing
+    )
+    await message.answer(
+        f"📨 Напоминание (дедлайн!) отправлено: {sent}/{len(missing)} сотрудникам.\n\n"
+        f"⚠️ <b>Дедлайн сегодня!</b>\n\n"
+        f"Ещё не сдали отчёт ({len(missing)}):\n{names}",
+        parse_mode="HTML",
     )
 
 
@@ -146,8 +225,10 @@ async def cmd_help(message: Message):
             "/reports — все отчёты за неделю\n"
             "/employees — список сотрудников\n"
             "/status — кто сдал, кто нет\n"
-            "/testreminder — отправить напоминание сейчас\n"
-            "/testmissed — проверить пропущенные дедлайны\n"
+            "/testreminder1 — напоминание (за 2 дня)\n"
+            "/testreminder2 — напоминание (за 1 день)\n"
+            "/testreminder3 — напоминание (дедлайн!) + уведомление владельцу\n"
+            "/testmissed — пропущенный дедлайн + уведомление всем\n"
         )
 
     await message.answer(text, parse_mode="HTML")
