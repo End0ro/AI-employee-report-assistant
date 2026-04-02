@@ -1,6 +1,7 @@
 from aiogram import Router, Bot
 from aiogram.filters import Command
 from aiogram.types import Message
+import asyncio
 
 from bot.config import OWNER_CHAT_ID
 from bot.models.employee import get_all_employees
@@ -59,9 +60,9 @@ async def cmd_status(message: Message):
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 
-@router.message(Command("testreminder1"))
-async def cmd_test_reminder1(message: Message, bot: Bot):
-    """Friday reminder — 2 days before deadline."""
+@router.message(Command("testreminder"))
+async def cmd_test_reminder(message: Message, bot: Bot):
+    """Simulates the full reminder cycle: 3 reminders + missed deadline report to owner."""
     if not is_owner(message):
         await message.answer("❌ Эта команда доступна только владельцу.")
         return
@@ -72,6 +73,9 @@ async def cmd_test_reminder1(message: Message, bot: Bot):
         await message.answer("✅ Все сотрудники уже сдали отчёт. Некому отправлять напоминание.")
         return
 
+    await message.answer("🧪 <b>Запуск полного цикла напоминаний...</b>", parse_mode="HTML")
+
+    # --- Reminder 1: Friday (2 days before) ---
     sent = 0
     for emp in missing:
         try:
@@ -89,23 +93,14 @@ async def cmd_test_reminder1(message: Message, bot: Bot):
             sent += 1
         except Exception:
             pass
+    await message.answer(f"1️⃣ Напоминание (за 2 дня) отправлено: {sent}/{len(missing)}")
 
-    await message.answer(
-        f"📨 Напоминание (за 2 дня) отправлено: {sent}/{len(missing)} сотрудникам.",
-    )
+    await asyncio.sleep(10)
 
-
-@router.message(Command("testreminder2"))
-async def cmd_test_reminder2(message: Message, bot: Bot):
-    """Saturday reminder — 1 day before deadline."""
-    if not is_owner(message):
-        await message.answer("❌ Эта команда доступна только владельцу.")
-        return
-
+    # --- Reminder 2: Saturday (1 day before) ---
     missing = await get_employees_without_report_this_week()
-
     if not missing:
-        await message.answer("✅ Все сотрудники уже сдали отчёт. Некому отправлять напоминание.")
+        await message.answer("✅ Все сотрудники сдали отчёт! Цикл завершён.")
         return
 
     sent = 0
@@ -125,23 +120,14 @@ async def cmd_test_reminder2(message: Message, bot: Bot):
             sent += 1
         except Exception:
             pass
+    await message.answer(f"2️⃣ Напоминание (за 1 день) отправлено: {sent}/{len(missing)}")
 
-    await message.answer(
-        f"📨 Напоминание (за 1 день) отправлено: {sent}/{len(missing)} сотрудникам.",
-    )
+    await asyncio.sleep(10)
 
-
-@router.message(Command("testreminder3"))
-async def cmd_test_reminder3(message: Message, bot: Bot):
-    """Sunday reminder — deadline day. Also notifies the owner."""
-    if not is_owner(message):
-        await message.answer("❌ Эта команда доступна только владельцу.")
-        return
-
+    # --- Reminder 3: Sunday (deadline day) ---
     missing = await get_employees_without_report_this_week()
-
     if not missing:
-        await message.answer("✅ Все сотрудники уже сдали отчёт. Некому отправлять напоминание.")
+        await message.answer("✅ Все сотрудники сдали отчёт! Цикл завершён.")
         return
 
     sent = 0
@@ -159,27 +145,12 @@ async def cmd_test_reminder3(message: Message, bot: Bot):
             sent += 1
         except Exception:
             pass
+    await message.answer(f"3️⃣ Напоминание (дедлайн!) отправлено: {sent}/{len(missing)}")
 
-    # Notify owner about who hasn't submitted
-    names = "\n".join(
-        f"  • {e['full_name']} (@{e['username'] or '—'})" for e in missing
-    )
-    await message.answer(
-        f"📨 Напоминание (дедлайн!) отправлено: {sent}/{len(missing)} сотрудникам.\n\n"
-        f"⚠️ <b>Дедлайн сегодня!</b>\n\n"
-        f"Ещё не сдали отчёт ({len(missing)}):\n{names}",
-        parse_mode="HTML",
-    )
+    await asyncio.sleep(10)
 
-
-@router.message(Command("testmissed"))
-async def cmd_test_missed(message: Message, bot: Bot):
-    if not is_owner(message):
-        await message.answer("❌ Эта команда доступна только владельцу.")
-        return
-
+    # --- Missed deadline: auto-notify owner ---
     missing = await get_employees_without_report_this_week()
-
     if not missing:
         await message.answer("🎉 <b>Все сотрудники сдали отчёт на этой неделе!</b>", parse_mode="HTML")
         return
@@ -187,13 +158,16 @@ async def cmd_test_missed(message: Message, bot: Bot):
     names = "\n".join(
         f"  • {e['full_name']} (@{e['username'] or '—'})" for e in missing
     )
-    await message.answer(
-        f"🚫 <b>Не сдали отчёт ({len(missing)}):</b>\n{names}\n\n"
-        f"Эти сотрудники пропустили дедлайн.",
+    await bot.send_message(
+        chat_id=OWNER_CHAT_ID,
+        text=(
+            f"🚫 <b>Дедлайн прошёл!</b>\n\n"
+            f"Не сдали отчёт ({len(missing)}):\n{names}\n\n"
+            f"Эти сотрудники пропустили дедлайн."
+        ),
         parse_mode="HTML",
     )
 
-    # Also notify employees who missed
     for emp in missing:
         try:
             await bot.send_message(
@@ -207,6 +181,8 @@ async def cmd_test_missed(message: Message, bot: Bot):
             )
         except Exception:
             pass
+
+    await message.answer("✅ <b>Тест завершён.</b> Полный цикл напоминаний выполнен.", parse_mode="HTML")
 
 
 @router.message(Command("help"))
@@ -225,10 +201,7 @@ async def cmd_help(message: Message):
             "/reports — все отчёты за неделю\n"
             "/employees — список сотрудников\n"
             "/status — кто сдал, кто нет\n"
-            "/testreminder1 — напоминание (за 2 дня)\n"
-            "/testreminder2 — напоминание (за 1 день)\n"
-            "/testreminder3 — напоминание (дедлайн!) + уведомление владельцу\n"
-            "/testmissed — пропущенный дедлайн + уведомление всем\n"
+            "/testreminder — полный цикл: 3 напоминания + отчёт владельцу\n"
         )
 
     await message.answer(text, parse_mode="HTML")
