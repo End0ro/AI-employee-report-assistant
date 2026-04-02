@@ -1,9 +1,11 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from aiogram import Bot
+from datetime import datetime, timedelta
 
 from bot.config import OWNER_CHAT_ID, TIMEZONE
-from bot.models.report import get_employees_without_report_this_week
+from bot.models.employee import get_all_employees
+from bot.models.report import get_employees_without_report_this_week, get_reports_for_week
 
 scheduler = AsyncIOScheduler(timezone=TIMEZONE)
 
@@ -112,6 +114,51 @@ async def check_missed_deadline(bot: Bot):
                 pass
 
 
+async def send_monday_summary(bot: Bot):
+    """Monday morning: send owner a summary of last week's reports."""
+    if not OWNER_CHAT_ID:
+        return
+
+    today = datetime.now()
+    last_monday = today - timedelta(days=today.weekday() + 7)
+    last_week_start = last_monday.strftime("%Y-%m-%d")
+
+    all_employees = await get_all_employees()
+    reports = await get_reports_for_week(last_week_start)
+
+    submitted_ids = {r["employee_id"] for r in reports}
+    submitted = [e for e in all_employees if e["id"] in submitted_ids]
+    not_submitted = [e for e in all_employees if e["id"] not in submitted_ids]
+
+    lines = [
+        f"📅 <b>Новая неделя началась!</b>\n",
+        f"Итоги прошлой недели ({last_week_start}):\n",
+        f"📊 Сдали отчёт: {len(submitted)}/{len(all_employees)}\n",
+    ]
+
+    if submitted:
+        lines.append("✅ <b>Сдали:</b>")
+        for e in submitted:
+            lines.append(f"  • {e['full_name']} (@{e['username'] or '—'})")
+
+    if not_submitted:
+        lines.append("\n❌ <b>Не сдали:</b>")
+        for e in not_submitted:
+            lines.append(f"  • {e['full_name']} (@{e['username'] or '—'})")
+
+    if not all_employees:
+        lines.append("Нет зарегистрированных сотрудников.")
+
+    try:
+        await bot.send_message(
+            chat_id=OWNER_CHAT_ID,
+            text="\n".join(lines),
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
+
+
 def setup_scheduler(bot: Bot):
     # Friday 18:00 MSK — 2 days before deadline
     scheduler.add_job(
@@ -146,6 +193,15 @@ def setup_scheduler(bot: Bot):
         CronTrigger(day_of_week="sun", hour=20, minute=0, timezone=TIMEZONE),
         args=[bot],
         id="check_missed",
+        replace_existing=True,
+    )
+
+    # Monday 9:00 MSK — weekly summary to owner
+    scheduler.add_job(
+        send_monday_summary,
+        CronTrigger(day_of_week="mon", hour=9, minute=0, timezone=TIMEZONE),
+        args=[bot],
+        id="monday_summary",
         replace_existing=True,
     )
 

@@ -19,6 +19,10 @@ async def save_report(
     db = await get_db()
     try:
         week_start = get_current_week_start()
+        await db.execute(
+            "DELETE FROM reports WHERE employee_id = ? AND week_start = ?",
+            (employee_id, week_start),
+        )
         cursor = await db.execute(
             """INSERT INTO reports (employee_id, ads_posted, views, reach_outs, favorites, ad_spend, week_start)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
