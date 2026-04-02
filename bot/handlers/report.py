@@ -1,6 +1,6 @@
-from aiogram import Router, Bot
+from aiogram import Router, Bot, F
 from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -12,10 +12,13 @@ from bot.models.report import get_current_week_start
 
 router = Router()
 
-CONFIRM_KB = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="✅ Подтвердить"), KeyboardButton(text="❌ Отменить")]],
-    resize_keyboard=True,
-    one_time_keyboard=True,
+CONFIRM_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Подтвердить", callback_data="report_confirm"),
+            InlineKeyboardButton(text="❌ Отменить", callback_data="report_cancel"),
+        ]
+    ]
 )
 
 
@@ -137,23 +140,18 @@ async def process_ad_spend(message: Message, state: FSMContext):
     await state.set_state(ReportForm.confirm)
 
 
-@router.message(ReportForm.confirm)
-async def process_confirm(message: Message, state: FSMContext, bot: Bot):
-    if message.text == "❌ Отменить":
-        await message.answer(
-            "🚫 Отчёт отменён. Используйте /report чтобы начать заново.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        await state.clear()
-        return
+@router.callback_query(F.data == "report_cancel", ReportForm.confirm)
+async def process_cancel(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("🚫 Отчёт отменён. Используйте /report чтобы начать заново.")
+    await callback.answer()
+    await state.clear()
 
-    if message.text != "✅ Подтвердить":
-        await message.answer("Нажмите одну из кнопок ниже:", reply_markup=CONFIRM_KB)
-        return
 
+@router.callback_query(F.data == "report_confirm", ReportForm.confirm)
+async def process_confirm(callback: CallbackQuery, state: FSMContext, bot: Bot):
     data = await state.get_data()
 
-    report_id = await save_report(
+    await save_report(
         employee_id=data["employee_id"],
         ads_posted=data["ads_posted"],
         views=data["views"],
@@ -162,10 +160,8 @@ async def process_confirm(message: Message, state: FSMContext, bot: Bot):
         ad_spend=data["ad_spend"],
     )
 
-    await message.answer(
-        "✅ Отчёт успешно отправлен! Спасибо.",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    await callback.message.edit_text("✅ Отчёт успешно отправлен! Спасибо.")
+    await callback.answer()
 
     # Forward report to owner
     from datetime import datetime
