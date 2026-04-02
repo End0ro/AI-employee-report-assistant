@@ -31,6 +31,16 @@ class ReportForm(StatesGroup):
     confirm = State()
 
 
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        await message.answer("Нет активного действия для отмены.")
+        return
+    await state.clear()
+    await message.answer("🚫 Действие отменено. Используйте /report чтобы начать заново.")
+
+
 @router.message(Command("report"))
 async def cmd_report(message: Message, state: FSMContext):
     employee = await get_employee_by_telegram_id(message.from_user.id)
@@ -57,7 +67,7 @@ async def cmd_report(message: Message, state: FSMContext):
     await state.set_state(ReportForm.ads_posted)
 
 
-@router.message(ReportForm.ads_posted)
+@router.message(ReportForm.ads_posted, F.text, ~F.text.startswith("/"))
 async def process_ads_posted(message: Message, state: FSMContext):
     if not message.text.strip().isdigit():
         await message.answer("❌ Введите целое число. Попробуйте ещё раз:")
@@ -71,7 +81,7 @@ async def process_ads_posted(message: Message, state: FSMContext):
     await state.set_state(ReportForm.views)
 
 
-@router.message(ReportForm.views)
+@router.message(ReportForm.views, F.text, ~F.text.startswith("/"))
 async def process_views(message: Message, state: FSMContext):
     if not message.text.strip().isdigit():
         await message.answer("❌ Введите целое число. Попробуйте ещё раз:")
@@ -85,7 +95,7 @@ async def process_views(message: Message, state: FSMContext):
     await state.set_state(ReportForm.reach_outs)
 
 
-@router.message(ReportForm.reach_outs)
+@router.message(ReportForm.reach_outs, F.text, ~F.text.startswith("/"))
 async def process_reach_outs(message: Message, state: FSMContext):
     if not message.text.strip().isdigit():
         await message.answer("❌ Введите целое число. Попробуйте ещё раз:")
@@ -99,7 +109,7 @@ async def process_reach_outs(message: Message, state: FSMContext):
     await state.set_state(ReportForm.favorites)
 
 
-@router.message(ReportForm.favorites)
+@router.message(ReportForm.favorites, F.text, ~F.text.startswith("/"))
 async def process_favorites(message: Message, state: FSMContext):
     if not message.text.strip().isdigit():
         await message.answer("❌ Введите целое число. Попробуйте ещё раз:")
@@ -114,7 +124,7 @@ async def process_favorites(message: Message, state: FSMContext):
     await state.set_state(ReportForm.ad_spend)
 
 
-@router.message(ReportForm.ad_spend)
+@router.message(ReportForm.ad_spend, F.text, ~F.text.startswith("/"))
 async def process_ad_spend(message: Message, state: FSMContext):
     try:
         ad_spend = float(message.text.strip().replace(",", "."))
