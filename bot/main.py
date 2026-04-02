@@ -42,8 +42,11 @@ async def main():
     setup_scheduler(bot)
     logger.info("Scheduler started")
 
+    # Delete any old webhook (e.g. from Vercel) so polling works
+    await bot.delete_webhook(drop_pending_updates=True)
+    logger.info("Webhook cleared, starting polling...")
+
     # Start polling
-    logger.info("Bot is starting...")
     try:
         await dp.start_polling(bot)
     finally:
