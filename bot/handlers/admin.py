@@ -76,7 +76,7 @@ async def cmd_test_reminder(message: Message, bot: Bot):
 
     await message.answer("🧪 <b>Запуск полного цикла напоминаний...</b>", parse_mode="HTML")
 
-    # --- Reminder 1: Friday (2 days before) ---
+    # --- Reminder 1: Thursday (2 days before) ---
     sent = 0
     for emp in missing:
         try:
@@ -98,7 +98,7 @@ async def cmd_test_reminder(message: Message, bot: Bot):
 
     await asyncio.sleep(10)
 
-    # --- Reminder 2: Saturday (1 day before) ---
+    # --- Reminder 2: Friday (1 day before) ---
     missing = await get_employees_without_report_this_week()
     if not missing:
         await message.answer("✅ Все сотрудники сдали отчёт! Цикл завершён.")
@@ -125,7 +125,7 @@ async def cmd_test_reminder(message: Message, bot: Bot):
 
     await asyncio.sleep(10)
 
-    # --- Reminder 3: Sunday (deadline day) ---
+    # --- Reminder 3: Saturday (deadline day) ---
     missing = await get_employees_without_report_this_week()
     if not missing:
         await message.answer("✅ Все сотрудники сдали отчёт! Цикл завершён.")
