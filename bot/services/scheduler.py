@@ -25,7 +25,7 @@ async def send_reminder(bot: Bot, is_deadline: bool = False):
                     text=(
                         "🚨 <b>Сегодня крайний срок сдачи отчёта!</b>\n\n"
                         "Пожалуйста, отправьте отчёт с помощью /report.\n"
-                        "Дедлайн: сегодня в 18:00."
+                        "Дедлайн: сегодня в 21:00."
                     ),
                     parse_mode="HTML",
                 )
@@ -57,7 +57,7 @@ async def send_reminder(bot: Bot, is_deadline: bool = False):
                     text=(
                         "⏰ <b>Напоминание!</b>\n\n"
                         "Не забудьте сдать еженедельный отчёт.\n"
-                        "Дедлайн: воскресенье, 18:00.\n\n"
+                        "Дедлайн: суббота, 21:00.\n\n"
                         "Отправьте отчёт: /report"
                     ),
                     parse_mode="HTML",
@@ -160,37 +160,37 @@ async def send_monday_summary(bot: Bot):
 
 
 def setup_scheduler(bot: Bot):
-    # Friday 18:00 MSK — 2 days before deadline
+    # Thursday 21:00 MSK — 2 days before deadline
     scheduler.add_job(
         send_reminder,
-        CronTrigger(day_of_week="fri", hour=18, minute=0, timezone=TIMEZONE),
+        CronTrigger(day_of_week="thu", hour=21, minute=0, timezone=TIMEZONE),
+        args=[bot, False],
+        id="reminder_thursday",
+        replace_existing=True,
+    )
+
+    # Friday 21:00 MSK — 1 day before deadline
+    scheduler.add_job(
+        send_reminder,
+        CronTrigger(day_of_week="fri", hour=21, minute=0, timezone=TIMEZONE),
         args=[bot, False],
         id="reminder_friday",
         replace_existing=True,
     )
 
-    # Saturday 18:00 MSK — 1 day before deadline
+    # Saturday 21:00 MSK — deadline day
     scheduler.add_job(
         send_reminder,
-        CronTrigger(day_of_week="sat", hour=18, minute=0, timezone=TIMEZONE),
-        args=[bot, False],
-        id="reminder_saturday",
-        replace_existing=True,
-    )
-
-    # Sunday 18:00 MSK — deadline day
-    scheduler.add_job(
-        send_reminder,
-        CronTrigger(day_of_week="sun", hour=18, minute=0, timezone=TIMEZONE),
+        CronTrigger(day_of_week="sat", hour=21, minute=0, timezone=TIMEZONE),
         args=[bot, True],
         id="reminder_deadline",
         replace_existing=True,
     )
 
-    # Sunday 20:00 MSK — check missed deadlines (2 hours after deadline)
+    # Saturday 23:00 MSK — check missed deadlines (2 hours after deadline)
     scheduler.add_job(
         check_missed_deadline,
-        CronTrigger(day_of_week="sun", hour=20, minute=0, timezone=TIMEZONE),
+        CronTrigger(day_of_week="sat", hour=23, minute=0, timezone=TIMEZONE),
         args=[bot],
         id="check_missed",
         replace_existing=True,
